@@ -188,6 +188,32 @@ async def root():
 def healthcheck():
     return {"status": "healthy"}
 
+@app.post("/init-db")
+async def initialize_database():
+    """Initialize database tables and seed data - for Railway deployment"""
+    try:
+        # Force create tables
+        SQLModel.metadata.drop_all(engine)
+        SQLModel.metadata.create_all(engine)
+        
+        # Seed initial data
+        with Session(engine) as session:
+            # Add sample students
+            students = [
+                Student(name="John Doe", roll="CS001", class_id="CS-A"),
+                Student(name="Jane Smith", roll="CS002", class_id="CS-A"),
+                Student(name="Bob Johnson", roll="CS003", class_id="CS-B")
+            ]
+            
+            for student in students:
+                session.add(student)
+            
+            session.commit()
+        
+        return {"message": "Database initialized successfully"}
+    except Exception as e:
+        return {"error": f"Database initialization failed: {str(e)}"}
+
 # Authentication endpoint
 @app.post("/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest, session: Session = Depends(get_session)):
