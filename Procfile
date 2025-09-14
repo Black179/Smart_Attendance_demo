@@ -1,1 +1,1 @@
-web: uvicorn attendance_demo.backend.main:app --host 0.0.0.0 --port 8000
+web: cd attendance_demo/backend && uvicorn main:app --host 0.0.0.0 --port $PORT
