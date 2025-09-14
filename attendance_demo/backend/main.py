@@ -192,13 +192,28 @@ def healthcheck():
 async def initialize_database():
     """Initialize database tables and seed data - for Railway deployment"""
     try:
-        # Force create tables
-        SQLModel.metadata.drop_all(engine)
-        SQLModel.metadata.create_all(engine)
+        # Clear metadata and recreate tables
+        SQLModel.metadata.clear()
         
-        # Seed initial data
+        # Recreate all table definitions
+        from sqlmodel import SQLModel
+        
+        # Force drop and create all tables
+        SQLModel.metadata.drop_all(engine, checkfirst=True)
+        SQLModel.metadata.create_all(engine, checkfirst=False)
+        
+        # Verify tables were created
         with Session(engine) as session:
-            # Add sample students
+            # Test if we can create a student record
+            test_student = Student(name="Test User", roll="TEST001", class_id="TEST")
+            session.add(test_student)
+            session.commit()
+            
+            # Remove test record
+            session.delete(test_student)
+            session.commit()
+            
+            # Add real sample students
             students = [
                 Student(name="John Doe", roll="CS001", class_id="CS-A"),
                 Student(name="Jane Smith", roll="CS002", class_id="CS-A"),
@@ -210,9 +225,10 @@ async def initialize_database():
             
             session.commit()
         
-        return {"message": "Database initialized successfully"}
+        return {"message": "Database initialized successfully", "tables_created": True}
     except Exception as e:
-        return {"error": f"Database initialization failed: {str(e)}"}
+        import traceback
+        return {"error": f"Database initialization failed: {str(e)}", "traceback": traceback.format_exc()}
 
 # Authentication endpoint
 @app.post("/auth/login", response_model=LoginResponse)
