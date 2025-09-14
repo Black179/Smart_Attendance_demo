@@ -47,17 +47,17 @@ class AppState extends ChangeNotifier {
     // Configure base URL - Update this with your deployed URL
     String baseUrl;
     
-    // For production deployment, uncomment and update this line:
-    baseUrl = 'https://smartattendancedemo-production.up.railway.app'; // Replace with your deployed URL
+    // For production deployment (use Railway URL):
+    baseUrl = 'https://smartattendancedemo-production.up.railway.app';
     
-    // For local development:
-    if (kIsWeb) {
-      baseUrl = 'http://127.0.0.1:8002';
-    } else if (Platform.isAndroid) {
-      baseUrl = 'http://10.0.2.2:8002'; // Android emulator
-    } else {
-      baseUrl = 'http://127.0.0.1:8002'; // iOS simulator, desktop
-    }
+    // For local development (comment out the line above and uncomment below):
+    // if (kIsWeb) {
+    //   baseUrl = 'http://127.0.0.1:8000';
+    // } else if (Platform.isAndroid) {
+    //   baseUrl = 'http://10.0.2.2:8000'; // Android emulator
+    // } else {
+    //   baseUrl = 'http://127.0.0.1:8000'; // iOS simulator, desktop
+    // }
     
     _dio.options.baseUrl = baseUrl;
     _dio.options.connectTimeout = const Duration(seconds: 30);

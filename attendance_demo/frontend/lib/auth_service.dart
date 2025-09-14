@@ -51,18 +51,21 @@ class AuthService {
   }) async {
     final dio = Dio();
     
+    // Configure base URL
+    dio.options.baseUrl = 'https://smartattendancedemo-production.up.railway.app';
+    
     // Add timeout configuration
     dio.options.connectTimeout = const Duration(seconds: 10);
     dio.options.receiveTimeout = const Duration(seconds: 10);
     
     if (kDebugMode) {
       print('AuthService: Attempting login for role: $role');
-      print('AuthService: Backend URL: http://localhost:8000/auth/login');
+      print('AuthService: Backend URL: ${dio.options.baseUrl}/auth/login');
     }
     
     try {
       final response = await dio.post(
-        'http://localhost:8000/auth/login',
+        '/auth/login',
         data: {
           'role': role,
           if (roll != null) 'roll': roll,
@@ -108,7 +111,7 @@ class AuthService {
       if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
         errorMessage = 'Connection timeout. Please check if the backend server is running.';
       } else if (e.type == DioExceptionType.connectionError) {
-        errorMessage = 'Cannot connect to server. Please ensure backend is running on localhost:8000';
+        errorMessage = 'Cannot connect to server. Please check your internet connection and try again.';
       } else if (e.response?.data != null && e.response!.data['detail'] != null) {
         errorMessage = e.response!.data['detail'];
       }

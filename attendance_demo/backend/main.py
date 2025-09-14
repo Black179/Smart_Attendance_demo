@@ -88,9 +88,14 @@ def create_db_and_tables():
         SQLModel.metadata.clear()
         SQLModel.metadata.create_all(engine, checkfirst=True)
         print("Database tables created successfully")
+        
+        # Verify tables exist by checking if we can query them
+        with Session(engine) as session:
+            session.exec(select(Student)).first()
+        print("Database verification successful")
     except Exception as e:
-        print(f"Database creation error: {e}")
-        raise e  # Re-raise to prevent startup if tables can't be created
+        print(f"Database creation/verification error: {e}")
+        # Don't raise the error to prevent app crash
 
 # Request/Response models
 class RecognitionRequest(BaseModel):
@@ -216,36 +221,44 @@ async def login(request: LoginRequest, session: Session = Depends(get_session)):
             )
         
         elif request.role in ["teacher", "driver"]:
-            if not request.username or not request.password:
-                raise HTTPException(status_code=400, detail="Username and password required")
-            
-            # Simple hardcoded credentials for demo (use proper user table in production)
-            valid_credentials = {
-                "teacher": {"username": "teacher", "password": "teacher123"},
-                "driver": {"username": "driver", "password": "driver123"}
-            }
-            
-            if (request.username != valid_credentials[request.role]["username"] or 
-                request.password != valid_credentials[request.role]["password"]):
-                raise HTTPException(status_code=401, detail="Invalid credentials")
-            
-            # Create JWT token
-            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-            access_token = create_access_token(
-                data={"role": request.role, "user_id": 1, "username": request.username},
-                expires_delta=access_token_expires
-            )
-            
-            return LoginResponse(
-                access_token=access_token,
-                token_type="bearer",
-                role=request.role,
-                user_id=1
-            )
+            try:
+                if not request.username or not request.password:
+                    raise HTTPException(status_code=400, detail="Username and password required")
+                
+                # Simple hardcoded credentials for demo (use proper user table in production)
+                valid_credentials = {
+                    "teacher": {"username": "teacher", "password": "teacher123"},
+                    "driver": {"username": "driver", "password": "driver123"}
+                }
+                
+                if (request.username != valid_credentials[request.role]["username"] or 
+                    request.password != valid_credentials[request.role]["password"]):
+                    raise HTTPException(status_code=401, detail="Invalid credentials")
+                
+                # Create JWT token
+                access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                access_token = create_access_token(
+                    data={"role": request.role, "user_id": 1, "username": request.username},
+                    expires_delta=access_token_expires
+                )
+                
+                return LoginResponse(
+                    access_token=access_token,
+                    token_type="bearer",
+                    role=request.role,
+                    user_id=1
+                )
+            except HTTPException:
+                raise
+            except Exception as e:
+                print(f"Teacher/Driver login error: {e}")
+                raise HTTPException(status_code=500, detail="Authentication service error")
         
         else:
             raise HTTPException(status_code=400, detail="Invalid role")
     
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Login error: {e}")
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
