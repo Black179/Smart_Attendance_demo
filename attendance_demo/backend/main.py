@@ -195,9 +195,6 @@ async def initialize_database():
         # Clear metadata and recreate tables
         SQLModel.metadata.clear()
         
-        # Recreate all table definitions
-        from sqlmodel import SQLModel
-        
         # Force drop and create all tables
         SQLModel.metadata.drop_all(engine, checkfirst=True)
         SQLModel.metadata.create_all(engine, checkfirst=False)
