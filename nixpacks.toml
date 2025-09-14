@@ -1,0 +1,12 @@
+[phases.setup]
+nixPkgs = [
+  "python311",
+  "glib",
+  "zlib",
+  "libglvnd",       # provides libGL.so.1
+  "libglvnd.dev",
+  "mesa",
+  "mesa_glu",
+  "ffmpeg",
+  "opencv"
+]
