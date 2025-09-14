@@ -52,8 +52,13 @@ security = HTTPBearer()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    create_db_and_tables()
-    seed_data()
+    try:
+        create_db_and_tables()
+        seed_data()
+        print("Application startup completed successfully")
+    except Exception as e:
+        print(f"Startup error: {e}")
+        # Don't raise the error to prevent app crash
     yield
     # Shutdown (if needed)
 

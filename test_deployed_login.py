@@ -2,7 +2,7 @@ import requests
 import json
 
 # Test the deployed API - replace with your Railway URL
-deployed_url = "https://smart-attendance-demo-production.up.railway.app"  # Update this with your actual Railway URL
+deployed_url = "https://smartattendancedemo-production.up.railway.app"  # Update this with your actual Railway URL
 
 def test_deployed_api():
     print("Testing deployed API health...")

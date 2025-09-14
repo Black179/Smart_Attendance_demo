@@ -48,7 +48,7 @@ class AppState extends ChangeNotifier {
     String baseUrl;
     
     // For production deployment, uncomment and update this line:
-    // baseUrl = 'https://your-app-name.railway.app'; // Replace with your deployed URL
+    baseUrl = 'https://smartattendancedemo-production.up.railway.app'; // Replace with your deployed URL
     
     // For local development:
     if (kIsWeb) {
