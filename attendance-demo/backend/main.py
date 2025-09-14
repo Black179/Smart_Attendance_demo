@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from contextlib import asynccontextmanager
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from typing import Optional, List
 import os
@@ -14,7 +15,7 @@ from face_recognition import parse_embedding, cosine_similarity, find_best_match
 import uvicorn
 
 # Database Models
-class Student(SQLModel, table=True):
+class Student(SQLModel, table=True, extend_existing=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     roll: str = Field(unique=True)
@@ -22,7 +23,7 @@ class Student(SQLModel, table=True):
     face_embedding: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class Attendance(SQLModel, table=True):
+class Attendance(SQLModel, table=True, extend_existing=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     student_id: int = Field(foreign_key="student.id")
     class_id: str
@@ -30,7 +31,7 @@ class Attendance(SQLModel, table=True):
     status: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class ODRequest(SQLModel, table=True):
+class ODRequest(SQLModel, table=True, extend_existing=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     student_id: int = Field(foreign_key="student.id")
     reason: str
@@ -48,28 +49,42 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    create_db_and_tables()
+    seed_data()
+    yield
+    # Shutdown (if needed)
+
 # Create FastAPI app
-app = FastAPI(title="SmartAttendance API", version="1.0.0")
+app = FastAPI(title="SmartAttendance API", version="1.0.0", lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
+    allow_origins=["*"],  # Allow all origins for public access
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
 # Database setup
 DATABASE_URL = "sqlite:///./db.sqlite3"
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(DATABASE_URL, echo=False)
 
 def get_session():
     with Session(engine) as session:
         yield session
 
 def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
+    try:
+        # Clear existing metadata to avoid conflicts
+        SQLModel.metadata.clear()
+        SQLModel.metadata.create_all(engine, checkfirst=True)
+    except Exception as e:
+        print(f"Database creation warning: {e}")
+        # Continue anyway as tables might already exist
 
 # Request/Response models
 class RecognitionRequest(BaseModel):
@@ -148,14 +163,6 @@ def seed_data():
         
         session.commit()
         print("Sample data seeded successfully")
-
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
-    seed_data()
-
-# Create uploads directory
-os.makedirs("uploads", exist_ok=True)
 
 @app.get("/")
 async def root():
@@ -557,4 +564,6 @@ async def receive_heartbeat(
     return {"message": "Heartbeat received", "student": student.name, "last_seen": timestamp}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

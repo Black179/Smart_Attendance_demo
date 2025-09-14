@@ -30,8 +30,11 @@ class AppState extends ChangeNotifier {
   AppState() {
     _dio = Dio();
     _syncManager = SyncManager();
-    // Configure Dio with auth interceptor
-    AuthService.configureDio(_dio);
+  }
+
+  Future<void> initialize() async {
+    _initializeDio();
+    await _initializeSyncManager();
   }
 
   UserRole? get currentRole => _currentRole;
@@ -41,24 +44,31 @@ class AppState extends ChangeNotifier {
   void _initializeDio() {
     _dio = Dio();
     
-    // Configure base URL based on platform
+    // Configure base URL - Update this with your deployed URL
     String baseUrl;
+    
+    // For production deployment, uncomment and update this line:
+    // baseUrl = 'https://your-app-name.railway.app'; // Replace with your deployed URL
+    
+    // For local development:
     if (kIsWeb) {
-      baseUrl = 'http://127.0.0.1:8000';
+      baseUrl = 'http://127.0.0.1:8002';
     } else if (Platform.isAndroid) {
-      baseUrl = 'http://10.0.2.2:8000'; // Android emulator
+      baseUrl = 'http://10.0.2.2:8002'; // Android emulator
     } else {
-      baseUrl = 'http://127.0.0.1:8000'; // iOS simulator, desktop
+      baseUrl = 'http://127.0.0.1:8002'; // iOS simulator, desktop
     }
     
     _dio.options.baseUrl = baseUrl;
-    _dio.options.connectTimeout = const Duration(seconds: 10);
-    _dio.options.receiveTimeout = const Duration(seconds: 10);
+    _dio.options.connectTimeout = const Duration(seconds: 30);
+    _dio.options.receiveTimeout = const Duration(seconds: 30);
   }
 
   Future<void> _initializeSyncManager() async {
     _syncManager = SyncManager();
     await _syncManager.initialize(_dio);
+    // Configure Dio with auth interceptor
+    AuthService.configureDio(_dio);
   }
 
   void setRole(UserRole role) {
@@ -76,11 +86,16 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   await AuthService.initialize();
+  
+  // Create and initialize AppState
+  final appState = AppState();
+  await appState.initialize();
+  
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context) => AppState()),
-        ChangeNotifierProvider(create: (context) => SyncManager()),
+        ChangeNotifierProvider.value(value: appState),
+        ChangeNotifierProvider.value(value: appState.syncManager),
       ],
       child: const MyApp(),
     ),
