@@ -3,24 +3,23 @@ import os
 import base64
 import io
 from typing import List, Optional, Tuple
-from deepface import DeepFace
 import numpy as np
 from PIL import Image
 import cv2
 
 # Face recognition similarity threshold from environment variable
-SIMILARITY_THRESHOLD = float(os.getenv('FACE_SIMILARITY_THRESHOLD', '0.6'))
+SIMILARITY_THRESHOLD = float(os.getenv('FACE_SIMILARITY_THRESHOLD', '0.7'))
 
-def extract_face_embedding(image_data: str, model_name: str = "VGG-Face") -> List[float]:
+def extract_face_embedding(image_data: str) -> List[float]:
     """
-    Extract face embedding from base64 encoded image using DeepFace.
+    Extract simple face features from base64 encoded image using OpenCV.
+    This is a lightweight alternative to DeepFace for deployment.
     
     Args:
         image_data: Base64 encoded image string
-        model_name: DeepFace model to use (VGG-Face, Facenet, OpenFace, etc.)
     
     Returns:
-        List of floats representing the face embedding
+        List of floats representing simple face features
     """
     try:
         # Decode base64 image
@@ -30,21 +29,51 @@ def extract_face_embedding(image_data: str, model_name: str = "VGG-Face") -> Lis
         # Convert PIL image to numpy array
         img_array = np.array(image)
         
-        # Convert RGB to BGR for OpenCV compatibility
-        if len(img_array.shape) == 3 and img_array.shape[2] == 3:
-            img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-        
-        # Extract embedding using DeepFace
-        embedding = DeepFace.represent(img_array, model_name=model_name, enforce_detection=False)
-        
-        # DeepFace.represent returns a list of dictionaries, get the first embedding
-        if isinstance(embedding, list) and len(embedding) > 0:
-            return embedding[0]["embedding"]
+        # Convert to grayscale for face detection
+        if len(img_array.shape) == 3:
+            gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
         else:
-            return embedding["embedding"]
+            gray = img_array
+        
+        # Load OpenCV's face detector
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        # Detect faces
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        
+        if len(faces) == 0:
+            # If no face detected, use whole image features
+            face_region = gray
+        else:
+            # Use the first detected face
+            x, y, w, h = faces[0]
+            face_region = gray[y:y+h, x:x+w]
+        
+        # Resize to standard size
+        face_region = cv2.resize(face_region, (64, 64))
+        
+        # Extract simple features (histogram and edge features)
+        # Histogram features
+        hist = cv2.calcHist([face_region], [0], None, [16], [0, 256])
+        hist_features = hist.flatten().tolist()
+        
+        # Edge features using Sobel
+        sobelx = cv2.Sobel(face_region, cv2.CV_64F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(face_region, cv2.CV_64F, 0, 1, ksize=3)
+        edge_magnitude = np.sqrt(sobelx**2 + sobely**2)
+        edge_features = cv2.resize(edge_magnitude, (8, 8)).flatten().tolist()
+        
+        # Combine features
+        features = hist_features + edge_features
+        
+        # Normalize features
+        features = np.array(features)
+        features = features / (np.linalg.norm(features) + 1e-8)
+        
+        return features.tolist()
             
     except Exception as e:
-        raise ValueError(f"Failed to extract face embedding: {str(e)}")
+        raise ValueError(f"Failed to extract face features: {str(e)}")
 
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
     """

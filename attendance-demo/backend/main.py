@@ -11,7 +11,6 @@ from pydantic import BaseModel
 import json
 import jwt
 from passlib.context import CryptContext
-from deepface import DeepFace
 import numpy as np
 import uvicorn
 
