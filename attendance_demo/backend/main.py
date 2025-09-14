@@ -192,37 +192,63 @@ def healthcheck():
 async def initialize_database():
     """Initialize database tables and seed data - for Railway deployment"""
     try:
-        # Clear metadata and recreate tables
-        SQLModel.metadata.clear()
+        # Use raw SQL to create tables if SQLModel fails
+        from sqlalchemy import text
         
-        # Force drop and create all tables
-        SQLModel.metadata.drop_all(engine, checkfirst=True)
-        SQLModel.metadata.create_all(engine, checkfirst=False)
+        with engine.begin() as conn:
+            # Drop existing tables
+            conn.execute(text("DROP TABLE IF EXISTS odrequest"))
+            conn.execute(text("DROP TABLE IF EXISTS attendance"))
+            conn.execute(text("DROP TABLE IF EXISTS student"))
+            
+            # Create student table
+            conn.execute(text("""
+                CREATE TABLE student (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR NOT NULL,
+                    roll VARCHAR UNIQUE NOT NULL,
+                    class_id VARCHAR NOT NULL,
+                    face_embedding TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            # Create attendance table
+            conn.execute(text("""
+                CREATE TABLE attendance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    student_id INTEGER NOT NULL,
+                    class_id VARCHAR NOT NULL,
+                    date VARCHAR NOT NULL,
+                    status VARCHAR NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (student_id) REFERENCES student(id)
+                )
+            """))
+            
+            # Create odrequest table
+            conn.execute(text("""
+                CREATE TABLE odrequest (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    student_id INTEGER NOT NULL,
+                    reason VARCHAR NOT NULL,
+                    file_path VARCHAR,
+                    status VARCHAR DEFAULT 'Pending',
+                    comment VARCHAR,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (student_id) REFERENCES student(id)
+                )
+            """))
+            
+            # Insert sample data
+            conn.execute(text("""
+                INSERT INTO student (name, roll, class_id) VALUES
+                ('John Doe', 'CS001', 'CS-A'),
+                ('Jane Smith', 'CS002', 'CS-A'),
+                ('Bob Johnson', 'CS003', 'CS-B')
+            """))
         
-        # Verify tables were created
-        with Session(engine) as session:
-            # Test if we can create a student record
-            test_student = Student(name="Test User", roll="TEST001", class_id="TEST")
-            session.add(test_student)
-            session.commit()
-            
-            # Remove test record
-            session.delete(test_student)
-            session.commit()
-            
-            # Add real sample students
-            students = [
-                Student(name="John Doe", roll="CS001", class_id="CS-A"),
-                Student(name="Jane Smith", roll="CS002", class_id="CS-A"),
-                Student(name="Bob Johnson", roll="CS003", class_id="CS-B")
-            ]
-            
-            for student in students:
-                session.add(student)
-            
-            session.commit()
-        
-        return {"message": "Database initialized successfully", "tables_created": True}
+        return {"message": "Database initialized successfully with raw SQL", "tables_created": True}
     except Exception as e:
         import traceback
         return {"error": f"Database initialization failed: {str(e)}", "traceback": traceback.format_exc()}
