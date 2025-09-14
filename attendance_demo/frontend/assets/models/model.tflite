@@ -1,4 +1,0 @@
-# Placeholder TensorFlow Lite model file
-# This is a dummy file representing where the actual face recognition model would be placed
-# In a real implementation, this would be a trained TensorFlow Lite model for face embeddings
-PLACEHOLDER_MODEL_FILE
