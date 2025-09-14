@@ -11,7 +11,8 @@ from pydantic import BaseModel
 import json
 import jwt
 from passlib.context import CryptContext
-from face_recognition import parse_embedding, cosine_similarity, find_best_match
+from deepface import DeepFace
+import numpy as np
 import uvicorn
 
 # Database Models
@@ -246,9 +247,18 @@ async def enroll_student(
     # Validate face embedding if provided
     if face_embedding:
         try:
-            embedding_data = parse_embedding(face_embedding)
-            if len(embedding_data) == 0:
-                raise ValueError("Empty embedding")
+            # For DeepFace, we can either store the base64 image or extract embedding
+            # Here we'll validate it's a valid base64 string or JSON embedding
+            if face_embedding.startswith('[') and face_embedding.endswith(']'):
+                # It's already an embedding JSON
+                embedding_data = parse_embedding(face_embedding)
+                if len(embedding_data) == 0:
+                    raise ValueError("Empty embedding")
+            else:
+                # It's a base64 image, extract embedding using DeepFace
+                from face_recognition import extract_face_embedding
+                embedding_data = extract_face_embedding(face_embedding)
+                face_embedding = json.dumps(embedding_data)  # Store as JSON
         except ValueError as e:
             raise HTTPException(status_code=400, detail=f"Invalid face embedding: {str(e)}")
     
