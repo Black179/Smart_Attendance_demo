@@ -15,7 +15,7 @@ import numpy as np
 import uvicorn
 
 # Database Models
-class Student(SQLModel, table=True, extend_existing=True):
+class Student(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     roll: str = Field(unique=True)
@@ -23,7 +23,7 @@ class Student(SQLModel, table=True, extend_existing=True):
     face_embedding: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class Attendance(SQLModel, table=True, extend_existing=True):
+class Attendance(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     student_id: int = Field(foreign_key="student.id")
     class_id: str
@@ -31,7 +31,7 @@ class Attendance(SQLModel, table=True, extend_existing=True):
     status: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class ODRequest(SQLModel, table=True, extend_existing=True):
+class ODRequest(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     student_id: int = Field(foreign_key="student.id")
     reason: str
@@ -82,9 +82,10 @@ def create_db_and_tables():
         # Clear existing metadata to avoid conflicts
         SQLModel.metadata.clear()
         SQLModel.metadata.create_all(engine, checkfirst=True)
+        print("Database tables created successfully")
     except Exception as e:
-        print(f"Database creation warning: {e}")
-        # Continue anyway as tables might already exist
+        print(f"Database creation error: {e}")
+        raise e  # Re-raise to prevent startup if tables can't be created
 
 # Request/Response models
 class RecognitionRequest(BaseModel):
@@ -145,24 +146,29 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 def seed_data():
     """Add sample data for testing"""
-    with Session(engine) as session:
-        # Check if data already exists
-        existing_student = session.exec(select(Student)).first()
-        if existing_student:
-            return
-        
-        # Add sample students
-        students = [
-            Student(name="John Doe", roll="CS001", class_id="CS-A"),
-            Student(name="Jane Smith", roll="CS002", class_id="CS-A"),
-            Student(name="Bob Johnson", roll="CS003", class_id="CS-B")
-        ]
-        
-        for student in students:
-            session.add(student)
-        
-        session.commit()
-        print("Sample data seeded successfully")
+    try:
+        with Session(engine) as session:
+            # Check if data already exists
+            existing_student = session.exec(select(Student)).first()
+            if existing_student:
+                print("Sample data already exists, skipping seeding")
+                return
+            
+            # Add sample students
+            students = [
+                Student(name="John Doe", roll="CS001", class_id="CS-A"),
+                Student(name="Jane Smith", roll="CS002", class_id="CS-A"),
+                Student(name="Bob Johnson", roll="CS003", class_id="CS-B")
+            ]
+            
+            for student in students:
+                session.add(student)
+            
+            session.commit()
+            print("Sample data seeded successfully")
+    except Exception as e:
+        print(f"Error seeding data: {e}")
+        # Don't raise the error, just log it - the app can still work without sample data
 
 @app.get("/")
 async def root():
