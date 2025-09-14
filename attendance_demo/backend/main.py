@@ -186,60 +186,69 @@ def healthcheck():
 # Authentication endpoint
 @app.post("/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest, session: Session = Depends(get_session)):
-    if request.role == "student":
-        if not request.roll:
-            raise HTTPException(status_code=400, detail="Roll number required for students")
+    try:
+        if request.role == "student":
+            if not request.roll:
+                raise HTTPException(status_code=400, detail="Roll number required for students")
+            
+            # Find student by roll number
+            student = session.exec(select(Student).where(Student.roll == request.roll)).first()
+            if not student:
+                # If no student found, create a default one for demo purposes
+                student = Student(name=f"Student {request.roll}", roll=request.roll, class_id="CS-A")
+                session.add(student)
+                session.commit()
+                session.refresh(student)
+            
+            # Create JWT token
+            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                data={"role": "student", "user_id": student.id, "roll": student.roll},
+                expires_delta=access_token_expires
+            )
+            
+            return LoginResponse(
+                access_token=access_token,
+                token_type="bearer",
+                role="student",
+                user_id=student.id,
+                roll=student.roll
+            )
         
-        # Find student by roll number
-        student = session.exec(select(Student).where(Student.roll == request.roll)).first()
-        if not student:
-            raise HTTPException(status_code=401, detail="Student not found")
+        elif request.role in ["teacher", "driver"]:
+            if not request.username or not request.password:
+                raise HTTPException(status_code=400, detail="Username and password required")
+            
+            # Simple hardcoded credentials for demo (use proper user table in production)
+            valid_credentials = {
+                "teacher": {"username": "teacher", "password": "teacher123"},
+                "driver": {"username": "driver", "password": "driver123"}
+            }
+            
+            if (request.username != valid_credentials[request.role]["username"] or 
+                request.password != valid_credentials[request.role]["password"]):
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+            # Create JWT token
+            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                data={"role": request.role, "user_id": 1, "username": request.username},
+                expires_delta=access_token_expires
+            )
+            
+            return LoginResponse(
+                access_token=access_token,
+                token_type="bearer",
+                role=request.role,
+                user_id=1
+            )
         
-        # Create JWT token
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"role": "student", "user_id": student.id, "roll": student.roll},
-            expires_delta=access_token_expires
-        )
-        
-        return LoginResponse(
-            access_token=access_token,
-            token_type="bearer",
-            role="student",
-            user_id=student.id,
-            roll=student.roll
-        )
+        else:
+            raise HTTPException(status_code=400, detail="Invalid role")
     
-    elif request.role in ["teacher", "driver"]:
-        if not request.username or not request.password:
-            raise HTTPException(status_code=400, detail="Username and password required")
-        
-        # Simple hardcoded credentials for demo (use proper user table in production)
-        valid_credentials = {
-            "teacher": {"username": "teacher", "password": "teacher123"},
-            "driver": {"username": "driver", "password": "driver123"}
-        }
-        
-        if (request.username != valid_credentials[request.role]["username"] or 
-            request.password != valid_credentials[request.role]["password"]):
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-        # Create JWT token
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"role": request.role, "user_id": 1, "username": request.username},
-            expires_delta=access_token_expires
-        )
-        
-        return LoginResponse(
-            access_token=access_token,
-            token_type="bearer",
-            role=request.role,
-            user_id=1
-        )
-    
-    else:
-        raise HTTPException(status_code=400, detail="Invalid role")
+    except Exception as e:
+        print(f"Login error: {e}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @app.post("/enroll")
 async def enroll_student(
