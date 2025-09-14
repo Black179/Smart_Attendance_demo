@@ -1,9 +1,0 @@
-[phases.setup]
-nixPkgs = [
-  "python311",
-  "glib",
-  "zlib",
-  "libglvnd",      # Provides libGL.so.1
-  "ffmpeg",        # Required by cv2 + deepface
-  "opencv",        # Ensures cv2 works
-]
